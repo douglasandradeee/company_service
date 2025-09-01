@@ -2,7 +2,10 @@ module company-service
 
 go 1.24.4
 
-require github.com/spf13/viper v1.20.1
+require (
+	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/spf13/viper v1.20.1
+)
 
 require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
