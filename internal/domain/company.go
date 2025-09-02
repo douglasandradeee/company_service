@@ -79,11 +79,11 @@ func (c *Company) validateNames() error {
 	}
 
 	if utf8.RuneCountInString(c.CorporateName) < 5 {
-		return errors.New("Razão Social deve ter pelo menos 2 caracteres")
+		return errors.New("Razão Social deve ter pelo menos 5 caracteres")
 	}
 
 	if utf8.RuneCountInString(c.CorporateName) > 150 {
-		return errors.New("Razão Social deve ter no máximo 100 caracteres")
+		return errors.New("Razão Social deve ter no máximo 150 caracteres")
 	}
 
 	return nil

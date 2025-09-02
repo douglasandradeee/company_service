@@ -45,14 +45,36 @@ func allDigitsEqual(cnpj string) bool {
 	return true
 }
 
-func calculateCNPJCheckerDigit(cnpj string, position int) string {
-	sum := 0
+func calculateCNPJCheckerDigit(cnpj string, digitNumber int) string {
 	weights := []int{6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
+	sum := 0
 
-	//Para o primeiro dígito, usa posição 5; para o segundo, 6
-	for i, char := range cnpj {
-		digit, _ := strconv.Atoi(string(char))
-		sum += digit * weights[i+position-i]
+	// Para o primeiro dígito verificador: usa os 12 primeiros dígitos
+	// Para o segundo dígito verificador: usa os 13 primeiros dígitos
+	numDigits := 12
+	if digitNumber == 2 {
+		numDigits = 13
+	}
+
+	// Garantir que não ultrapassamos o tamanho do CNPJ
+	if numDigits > len(cnpj) {
+		numDigits = len(cnpj)
+	}
+
+	for i := 0; i < numDigits; i++ {
+		digit, _ := strconv.Atoi(string(cnpj[i]))
+
+		// Ajustar o índice do peso baseado no dígito verificador
+		weightIndex := i
+		if digitNumber == 2 {
+			// Para o segundo dígito, os pesos começam do índice 1
+			weightIndex = i + 1
+		}
+
+		// Garantir que o weightIndex está dentro dos limites
+		if weightIndex < len(weights) {
+			sum += digit * weights[weightIndex]
+		}
 	}
 
 	remainder := sum % 11
