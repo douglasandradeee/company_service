@@ -1,0 +1,18 @@
+# Binários
+/main
+/company-service
+*.exe
+*.out
+
+# Dependencies
+/vendor
+/go.sum
+
+# Environment
+.env
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/

@@ -1,0 +1,187 @@
+package service
+
+import (
+	"company-service/internal/domain"
+	"company-service/internal/messaging"
+	"company-service/internal/repository"
+	"context"
+	"fmt"
+
+	"go.uber.org/zap"
+)
+
+type companyService struct {
+	repo            repository.CompanyRepository
+	messageProducer messaging.MessageProducer
+	logger          *zap.Logger
+}
+
+// NewCompanyService cria uma nova instância de CompanyService.
+func NewCompanyService(repo repository.CompanyRepository, messageProducer messaging.MessageProducer, logger *zap.Logger) CompanyService {
+	return &companyService{
+		repo:            repo,
+		messageProducer: messageProducer,
+		logger:          logger,
+	}
+}
+
+// CreateCompany cria uam nova empresa.
+func (s *companyService) CreateCompany(ctx context.Context, company *domain.Company) error {
+	// Validação dos dados de entrada
+	if err := company.Validate(); err != nil {
+		return NewServiceError(err, "dados da empresa inválidos", "VALIDATION_ERROR")
+	}
+
+	// Verifica se o CNPJ já existe
+	existing, err := s.repo.GetByCNPJ(ctx, company.CNPJ)
+	if err != nil {
+		return NewServiceError(err, "erro ao verificar CNPJ", "REPOSITORY_ERROR")
+	}
+	if existing != nil {
+		return NewServiceError(err, fmt.Sprintf("CNPJ %s já cadastrado", company.CNPJ), "CNPJ_CONFLICT")
+	}
+
+	// Hook para createdAT e updatedAT
+	company.BeforeCreate()
+
+	// Persiste empresa no repositório
+	if err := s.repo.Create(ctx, company); err != nil {
+		return NewServiceError(err, "erro ao criar empresa", "REPOSITORY_ERROR")
+	}
+
+	// Envia mensagem para o RabbitMQ (async - não bloqueia)
+	go s.sendCompanyCreatedMessage(context.Background(), company)
+
+	s.logger.Info("Empresa criada com sucesso",
+		zap.String("company_id", company.ID),
+		zap.String("cnpj", company.CNPJ))
+
+	return nil
+}
+
+// GetCompany busca uma empresa pelo ID.
+func (s *companyService) GetCompany(ctx context.Context, id string) (*domain.Company, error) {
+	if id == "" {
+		return nil, NewServiceError(ErrInvalidCompanyData, "ID é obrigatório", "VALIDATION_ERROR")
+	}
+
+	company, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, NewServiceError(err, "erro ao buscar empresa", "REPOSITORY_ERROR")
+	}
+	if company == nil {
+		return nil, NewServiceError(ErrCompanyNotFound, fmt.Sprintf("Empresa com ID %s não encontrada", id), "NOT_FOUND")
+	}
+	return company, nil
+}
+
+// UpdateCompany atualiza uma empresa existente.
+func (s *companyService) UpdateCompany(ctx context.Context, company *domain.Company) error {
+	// Valida os dados de entrada
+	if err := company.Validate(); err != nil {
+		return NewServiceError(err, "dados da empresa inválidos", "VALIDATION_ERROR")
+	}
+
+	// Verifica se a empresa existe
+	existing, err := s.repo.GetByID(ctx, company.ID)
+	if err != nil {
+		return NewServiceError(err, "erro ao buscar empresa", "REPOSITORY_ERROR")
+	}
+	if existing == nil {
+		return NewServiceError(ErrCompanyNotFound, fmt.Sprintf("Empresa com ID %s não encontrada", company.ID), "NOT_FOUND")
+	}
+
+	// Verifica se CNPJ foi alterado e se novo CNPJ já existe
+	if existing.CNPJ != company.CNPJ {
+		cnpjExists, err := s.repo.GetByCNPJ(ctx, company.CNPJ)
+		if err != nil {
+			return NewServiceError(err, "erro ao verificar CNPJ", "REPOSITORY_ERROR")
+		}
+		if cnpjExists != nil {
+			return NewServiceError(ErrCNPJAlreadyExists, fmt.Sprintf("CNPJ %s já cadastrado", company.CNPJ), "CNPJ_CONFLICT")
+		}
+	}
+
+	// Hook para updatedAT
+	company.BeforeUpdate()
+
+	// Persiste empresa no repositório
+	if err := s.repo.Update(ctx, company); err != nil {
+		return NewServiceError(err, "erro ao atualizar empresa", "REPOSITORY_ERROR")
+	}
+
+	// Envia mensagem para o RabbitMQ (async - não bloqueia)
+	go s.sendCompanyUpdatedMessage(context.Background(), company)
+
+	s.logger.Info("Empresa atualizada com sucesso",
+		zap.String("company_id", company.ID))
+
+	return nil
+}
+
+// DeleteCompany remove uma empresa.
+func (s *companyService) DeleteCompany(ctx context.Context, id string) error {
+	if id == "" {
+		return NewServiceError(ErrInvalidCompanyData, "ID é obrigatório", "VALIDATION_ERROR")
+	}
+
+	company, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return NewServiceError(err, "erro ao buscar empresa", "REPOSITORY_ERROR")
+	}
+	if company == nil {
+		return NewServiceError(ErrCompanyNotFound, fmt.Sprintf("Empresa com ID %s não encontrada", id), "NOT_FOUND")
+	}
+
+	// Envia mensagem para o RabbitMQ (async - não bloqueia)
+	go s.sendCompanyDeletedMessage(context.Background(), company)
+
+	s.logger.Info("Empresa removida com sucesso",
+		zap.String("company_id", company.ID))
+
+	return nil
+}
+
+// ListCompanies implements CompanyService.
+func (s *companyService) ListCompanies(ctx context.Context, page int, limit int) ([]*domain.Company, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	companies, err := s.repo.List(ctx, page, limit)
+	if err != nil {
+		return nil, NewServiceError(err, "erro ao listar empresas", "REPOSITORY_ERROR")
+	}
+
+	return companies, nil
+}
+
+func (s *companyService) sendCompanyCreatedMessage(ctx context.Context, company *domain.Company) {
+	// Envia mensagem de criação de empresa para o RabbitMQ
+	if err := s.messageProducer.SendCompanyCreated(ctx, company); err != nil {
+		s.logger.Error("erro ao enviar mensagem de criação",
+			zap.Error(err),
+			zap.String("company_id", company.ID))
+	}
+}
+
+func (s *companyService) sendCompanyUpdatedMessage(ctx context.Context, company *domain.Company) {
+	// Envia mensagem de atualização de empresa para o RabbitMQ
+	if err := s.messageProducer.SendCompanyUpdated(ctx, company); err != nil {
+		s.logger.Error("erro ao enviar mensagem de atualização",
+			zap.Error(err),
+			zap.String("company_id", company.ID))
+	}
+}
+
+func (s *companyService) sendCompanyDeletedMessage(ctx context.Context, company *domain.Company) {
+	// Envia mensagem de exclusão de empresa para o RabbitMQ
+	if err := s.messageProducer.SendCompanyDeleted(ctx, company); err != nil {
+		s.logger.Error("erro ao enviar mensagem de exclusão",
+			zap.Error(err),
+			zap.String("company_id", company.ID))
+	}
+}
