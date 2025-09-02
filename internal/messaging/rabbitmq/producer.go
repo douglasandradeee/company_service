@@ -56,18 +56,18 @@ func NewProducer(uri, queueName string) (messaging.MessageProducer, error) {
 }
 
 func (p *rabbitMQProducer) SendCompanyCreated(ctx context.Context, company *domain.Company) error {
-	return p.sendMessage(ctx, "company_created", "Cadastro de EMPRESA "+company.FantasyName, company)
+	return p.sendMessage(ctx, "Cadastro de EMPRESA "+company.FantasyName, company)
 }
 
 func (p *rabbitMQProducer) SendCompanyUpdated(ctx context.Context, company *domain.Company) error {
-	return p.sendMessage(ctx, "company_updated", "Edição da EMPRESA "+company.FantasyName, company)
+	return p.sendMessage(ctx, "Edição da EMPRESA "+company.FantasyName, company)
 }
 
 func (p *rabbitMQProducer) SendCompanyDeleted(ctx context.Context, company *domain.Company) error {
-	return p.sendMessage(ctx, "company_deleted", "Exclusão de EMPRESA"+company.FantasyName, company)
+	return p.sendMessage(ctx, "Exclusão de EMPRESA"+company.FantasyName, company)
 }
 
-func (p *rabbitMQProducer) sendMessage(ctx context.Context, eventType, messageTxt string, company *domain.Company) error {
+func (p *rabbitMQProducer) sendMessage(ctx context.Context, messageTxt string, company *domain.Company) error {
 
 	message := map[string]interface{}{
 		"operation":  messageTxt, // EX: "Cadastro de EMPRESA XXX"
