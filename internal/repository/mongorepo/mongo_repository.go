@@ -62,6 +62,9 @@ func (r *mongoRepository) GetByCNPJ(ctx context.Context, cnpj string) (*domain.C
 	var company domain.Company
 	err := r.collection.FindOne(ctx, bson.M{"cnpj": cnpj}).Decode(&company)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &company, nil
