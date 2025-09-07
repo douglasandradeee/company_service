@@ -5,6 +5,13 @@ import (
 	"strconv"
 )
 
+func IsValidObjectID(id string) bool {
+	// Verifica se o ID tem 24 caracteres hexadecimais
+	objectIDPatternRegex := `^[a-fA-F0-9]{24}$`
+	matched, _ := regexp.MatchString(objectIDPatternRegex, id)
+	return matched
+}
+
 func ValidCNPJ(cnpj string) bool {
 	// Verifica se a string está vazia
 	if cnpj == "" {

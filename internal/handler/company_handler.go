@@ -3,6 +3,7 @@ package handler
 import (
 	"company-service/internal/domain"
 	"company-service/internal/service"
+	"company-service/pkg/utils"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -51,6 +52,13 @@ func (h *CompanyHandler) GetCompanyHandler(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	id := vars["id"]
 
+	//Verify if id is a valid ObjectID
+	if !utils.IsValidObjectID(id) {
+		h.logger.Warn("Invalid company ID format", zap.String("id", id))
+		http.Error(w, `{"error": "Invalid company ID format"}`, http.StatusBadRequest)
+		return
+	}
+
 	h.logger.Info("Received request to get company", zap.String("id", id))
 
 	company, err := h.service.GetCompany(r.Context(), id)
@@ -69,6 +77,13 @@ func (h *CompanyHandler) GetCompanyHandler(w http.ResponseWriter, r *http.Reques
 func (h *CompanyHandler) UpdateCompanyHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+
+	//Verify if id is a valid ObjectID
+	if !utils.IsValidObjectID(id) {
+		h.logger.Warn("Invalid company ID format", zap.String("id", id))
+		http.Error(w, `{"error": "Invalid company ID format"}`, http.StatusBadRequest)
+		return
+	}
 
 	h.logger.Info("Received request to update company", zap.String("id", id))
 
@@ -95,6 +110,13 @@ func (h *CompanyHandler) UpdateCompanyHandler(w http.ResponseWriter, r *http.Req
 func (h *CompanyHandler) DeleteCompanyHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+
+	//Verify if id is a valid ObjectID
+	if !utils.IsValidObjectID(id) {
+		h.logger.Warn("Invalid company ID format", zap.String("id", id))
+		http.Error(w, `{"error": "Invalid company ID format"}`, http.StatusBadRequest)
+		return
+	}
 
 	h.logger.Info("Received request to delete company", zap.String("id", id))
 
