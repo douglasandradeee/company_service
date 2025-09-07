@@ -64,7 +64,7 @@ func (p *rabbitMQProducer) SendCompanyUpdated(ctx context.Context, company *doma
 }
 
 func (p *rabbitMQProducer) SendCompanyDeleted(ctx context.Context, company *domain.Company) error {
-	return p.sendMessage(ctx, "Exclusão de EMPRESA"+company.FantasyName, company)
+	return p.sendMessage(ctx, "Exclusão de EMPRESA "+company.FantasyName, company)
 }
 
 func (p *rabbitMQProducer) sendMessage(ctx context.Context, messageTxt string, company *domain.Company) error {
