@@ -49,6 +49,9 @@ func (r *mongoRepository) GetByID(ctx context.Context, id string) (*domain.Compa
 	var company domain.Company
 	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&company)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &company, nil
