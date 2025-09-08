@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"company-service/internal/domain"
+	"company-service/internal/dto"
 	"company-service/internal/service"
 	"company-service/pkg/utils"
 	"encoding/json"
@@ -28,21 +28,26 @@ func NewCompanyHandler(service service.CompanyService, logger *zap.Logger) *Comp
 func (h *CompanyHandler) CreateCompanyHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("Received request to create company")
 
-	var company domain.Company
-	if err := json.NewDecoder(r.Body).Decode(&company); err != nil {
+	var req dto.CreateCompanyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode request body", zap.Error(err))
 		http.Error(w, `{"error": "Invalid JSON format"}`, http.StatusBadRequest)
 		return
 	}
+
+	// Convert DTO to domain model
+	company := *dto.ToDomainCompanyCreate(&req)
 
 	if err := h.service.CreateCompany(r.Context(), &company); err != nil {
 		h.handleServiceError(w, err)
 		return
 	}
 
+	response := dto.FromDomainCompany(&company)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(company); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.logger.Error("Failed to encode response", zap.Error(err))
 	}
 }
@@ -67,8 +72,10 @@ func (h *CompanyHandler) GetCompanyHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	response := dto.FromDomainCompany(company)
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(company); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.logger.Error("Failed to encode response", zap.Error(err))
 	}
 }
@@ -87,21 +94,25 @@ func (h *CompanyHandler) UpdateCompanyHandler(w http.ResponseWriter, r *http.Req
 
 	h.logger.Info("Received request to update company", zap.String("id", id))
 
-	var company domain.Company
-	if err := json.NewDecoder(r.Body).Decode(&company); err != nil {
+	var req dto.UpdateCompanyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode request body", zap.Error(err))
 		http.Error(w, `{"error": "Invalid JSON format"}`, http.StatusBadRequest)
 		return
 	}
-	company.ID = id
 
-	if err := h.service.UpdateCompany(r.Context(), &company); err != nil {
+	company := *dto.ToDomainCompanyUpdate(&req, id)
+
+	updateCompany, err := h.service.UpdateCompany(r.Context(), &company)
+	if err != nil {
 		h.handleServiceError(w, err)
 		return
 	}
 
+	response := dto.FromDomainCompany(updateCompany)
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(company); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.logger.Error("Failed to encode response", zap.Error(err))
 	}
 }

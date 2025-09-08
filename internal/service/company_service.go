@@ -82,29 +82,29 @@ func (s *companyService) GetCompany(ctx context.Context, id string) (*domain.Com
 }
 
 // UpdateCompany atualiza uma empresa existente.
-func (s *companyService) UpdateCompany(ctx context.Context, company *domain.Company) error {
+func (s *companyService) UpdateCompany(ctx context.Context, company *domain.Company) (*domain.Company, error) {
 	// Valida os dados de entrada
 	if err := company.Validate(); err != nil {
-		return NewServiceError(err, "dados da empresa inválidos", "VALIDATION_ERROR")
+		return nil, NewServiceError(err, "dados da empresa inválidos", "VALIDATION_ERROR")
 	}
 
 	// Verifica se a empresa existe
 	existing, err := s.repo.GetByID(ctx, company.ID)
 	if err != nil {
-		return NewServiceError(err, "erro ao buscar empresa", "REPOSITORY_ERROR")
+		return nil, NewServiceError(err, "erro ao buscar empresa", "REPOSITORY_ERROR")
 	}
 	if existing == nil {
-		return NewServiceError(ErrCompanyNotFound, fmt.Sprintf("Empresa com ID %s não encontrada", company.ID), "NOT_FOUND")
+		return nil, NewServiceError(ErrCompanyNotFound, fmt.Sprintf("Empresa com ID %s não encontrada", company.ID), "NOT_FOUND")
 	}
 
 	// Verifica se CNPJ foi alterado e se novo CNPJ já existe
 	if existing.CNPJ != company.CNPJ {
 		cnpjExists, err := s.repo.GetByCNPJ(ctx, company.CNPJ)
 		if err != nil {
-			return NewServiceError(err, "erro ao verificar CNPJ", "REPOSITORY_ERROR")
+			return nil, NewServiceError(err, "erro ao verificar CNPJ", "REPOSITORY_ERROR")
 		}
 		if cnpjExists != nil {
-			return NewServiceError(ErrCNPJAlreadyExists, fmt.Sprintf("CNPJ %s já cadastrado", company.CNPJ), "CNPJ_CONFLICT")
+			return nil, NewServiceError(ErrCNPJAlreadyExists, fmt.Sprintf("CNPJ %s já cadastrado", company.CNPJ), "CNPJ_CONFLICT")
 		}
 	}
 
@@ -112,17 +112,18 @@ func (s *companyService) UpdateCompany(ctx context.Context, company *domain.Comp
 	company.BeforeUpdate()
 
 	// Persiste empresa no repositório
-	if err := s.repo.Update(ctx, company); err != nil {
-		return NewServiceError(err, "erro ao atualizar empresa", "REPOSITORY_ERROR")
+	updateCompany, err := s.repo.Update(ctx, company)
+	if err != nil {
+		return nil, NewServiceError(err, "erro ao atualizar empresa", "REPOSITORY_ERROR")
 	}
 
 	// Envia mensagem para o RabbitMQ com retry (async - não bloqueia)
-	go s.sendCompanyUpdatedMessage(context.Background(), company)
+	go s.sendCompanyUpdatedMessage(context.Background(), updateCompany)
 
 	s.logger.Info("Empresa atualizada com sucesso",
-		zap.String("company_id", company.ID))
+		zap.String("company_id", updateCompany.ID))
 
-	return nil
+	return updateCompany, nil
 }
 
 // DeleteCompany remove uma empresa.

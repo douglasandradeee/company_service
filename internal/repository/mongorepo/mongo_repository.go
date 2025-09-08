@@ -74,29 +74,42 @@ func (r *mongoRepository) GetByCNPJ(ctx context.Context, cnpj string) (*domain.C
 }
 
 // Update atualiza uma empresa existente.
-func (r *mongoRepository) Update(ctx context.Context, company *domain.Company) error {
+func (r *mongoRepository) Update(ctx context.Context, company *domain.Company) (*domain.Company, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	objectID, err := primitive.ObjectIDFromHex(company.ID)
 	if err != nil {
-		return errors.New("invalid company ID")
+		return nil, errors.New("invalid company ID")
 	}
 
 	company.BeforeUpdate()
+
 	filter := bson.M{"_id": objectID}
-	update := bson.M{"$set": company}
+	update := bson.M{
+		"$set": bson.M{
+			"cnpj":                            company.CNPJ,
+			"fantasy_name":                    company.FantasyName,
+			"corporate_name":                  company.CorporateName,
+			"address":                         company.Address,
+			"employee_count":                  company.EmployeeCount,
+			"required_min_pwd_employee_count": company.RequiredMinPWDEmployeeCount,
+			"updated_at":                      company.UpdatedAt,
+		},
+	}
 
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var updatedCompany domain.Company
+	err = r.collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updatedCompany)
 	if err != nil {
-		return err
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("company not found")
+		}
+		return nil, err
 	}
 
-	if result.MatchedCount == 0 {
-		return errors.New("company not found")
-	}
-
-	return nil
+	return &updatedCompany, nil
 }
 
 // Delete remove uma empresa pelo ID.
