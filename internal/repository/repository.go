@@ -10,7 +10,7 @@ type CompanyRepository interface {
 	Create(ctx context.Context, company *domain.Company) error
 	GetByID(ctx context.Context, id string) (*domain.Company, error)
 	GetByCNPJ(ctx context.Context, cnpj string) (*domain.Company, error)
-	Update(ctx context.Context, company *domain.Company) error
+	Update(ctx context.Context, company *domain.Company) (*domain.Company, error)
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, page, limit int) ([]*domain.Company, error)
 	Count(ctx context.Context) (int64, error)
